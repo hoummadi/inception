@@ -1,0 +1,121 @@
+version: '3.3'
+services:
+  mariadb:
+    image: mariadb
+    build:
+      context: ./requirements/mariadb/
+      args:
+        - DB_USER=${DB_USER}
+        - DB_PASSWORD=${DB_PASSWORD}
+        - DB_NAME=${DB_NAME}
+        - MYSQL_ROOT_PASS=${MYSQL_ROOT_PASS}
+    restart: unless-stopped
+    volumes:
+      - database:/var/lib/mysql
+    container_name: "mariadb"
+    networks:
+      - inception
+  adminer:
+    depends_on: 
+      - mariadb
+    image: adminer
+    build:
+      context: ./requirements/bonus/adminer
+      args:
+        - DB_USER=${DB_USER}
+        - DB_PASSWORD=${DB_PASSWORD}
+        - DB_NAME=${DB_NAME}
+        - MYSQL_ROOT_PASS=${MYSQL_ROOT_PASS}
+    container_name: adminer
+    restart: unless-stopped
+    ports:
+      - "9500:9500"
+    volumes:
+      - database:/var/lib/mysql
+    networks:
+     - inception
+  wordpress:
+    build: ./requirements/wordpress
+    image: wordpress
+    container_name: wordpress
+    restart: unless-stopped
+    env_file:
+     - .env
+    volumes:
+      - files:/var/www/html
+    networks:
+     - inception
+  nginx:
+    build:
+     context: ./requirements/nginx
+     args:
+       - CERTS=${CERTS}
+    image: nginx
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+     - files:/var/www/html
+    ports:
+      - "443:443"
+    networks:
+     - inception
+  static_site:
+    build: ./requirements/bonus/static_site
+    image: static_site
+    container_name: static_site
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+     - inception
+  ftp:
+    depends_on:
+      - wordpress
+    build: ./requirements/bonus/ftp
+    image: ftp
+    container_name: ftp
+    restart: unless-stopped
+    env_file:
+     - .env
+    ports:
+      - "21:21"
+    volumes:
+      - files:/var/www/html
+    networks:
+      - inception
+  portainer:
+    build: ./requirements/bonus/portainer
+    image: portainer
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_vol:/data
+    ports:
+      - 9000:9000
+    networks:
+      - inception
+networks:
+  inception:
+volumes:
+  database:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/hhoummad/data/database
+      o: bind
+  files:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/hhoummad/data/files
+      o: bind
+  portainer_vol:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/hhoummad/data/portainer_vol
+      o: bind
